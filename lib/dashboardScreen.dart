@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'Expense_Page.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -63,7 +64,12 @@ class DashboardScreen extends StatelessWidget {
       // NÚT +
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Mở màn hình thêm giao dịch
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddTransactionScreen(),
+            ),
+          );
         },
         backgroundColor: const Color(0xFF2878E8),
         elevation: 4,
