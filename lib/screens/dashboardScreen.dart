@@ -1,12 +1,41 @@
 import 'package:flutter/material.dart';
 
+import 'package:andev/models/transaction.dart';
+import 'package:andev/services/transaction_service.dart';
+
 import 'Expense_Page.dart';
 import 'profile_screen.dart';
 import 'statistics_screen.dart';
 import 'transactions_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  List<Transaction> transactions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    try {
+      final result = await TransactionService.getAll();
+      if (mounted) setState(() => transactions = result);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể tải dữ liệu giao dịch')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +92,14 @@ class DashboardScreen extends StatelessWidget {
       // NÚT +
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.push(
+          Navigator.push<bool>(
             context,
             MaterialPageRoute(
               builder: (context) => const AddTransactionScreen(),
             ),
-          );
+          ).then((changed) {
+            if (changed == true) _loadTransactions();
+          });
         },
         backgroundColor: const Color(0xFF2878E8),
         elevation: 4,
@@ -77,6 +108,30 @@ class DashboardScreen extends StatelessWidget {
 
       // THANH ĐIỀU HƯỚNG
       bottomNavigationBar: _buildBottomNavigation(context),
+    );
+  }
+
+  String _formatDate(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  String _formatAmount(double value) => value.round().toString();
+
+  void _showMessage(BuildContext context, String title) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: const Text('Hiện chưa có nội dung mới.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -89,7 +144,7 @@ class DashboardScreen extends StatelessWidget {
       children: [
         // MENU
         IconButton(
-          onPressed: () {},
+          onPressed: () => _showMessage(context, 'Menu'),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           icon: const Icon(Icons.menu, size: 21, color: Color(0xFF172033)),
@@ -113,7 +168,7 @@ class DashboardScreen extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             IconButton(
-              onPressed: () {},
+              onPressed: () => _showMessage(context, 'Thông báo'),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               icon: const Icon(
@@ -155,6 +210,10 @@ class DashboardScreen extends StatelessWidget {
   // =========================================================
 
   Widget _buildBalanceCard() {
+    final balance =
+        5000000 +
+        TransactionService.totalIncome(transactions) -
+        TransactionService.totalExpense(transactions);
     return Container(
       width: double.infinity,
       height: 108,
@@ -223,8 +282,8 @@ class DashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 7),
 
-              const Text(
-                '5.000.000 đ',
+              Text(
+                '${_formatAmount(balance)} đ',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 25,
@@ -285,12 +344,14 @@ class DashboardScreen extends StatelessWidget {
   // =========================================================
 
   Widget _buildIncomeExpense() {
+    final income = TransactionService.totalIncome(transactions);
+    final expense = TransactionService.totalExpense(transactions);
     return Row(
       children: [
         Expanded(
           child: _buildMoneyCard(
             title: 'TỔNG THU NHẬP',
-            amount: '8.000.000 đ',
+            amount: '${_formatAmount(income)} đ',
             icon: Icons.arrow_downward,
             iconColor: const Color(0xFF42B866),
             backgroundColor: const Color(0xFFEAF8EC),
@@ -303,7 +364,7 @@ class DashboardScreen extends StatelessWidget {
         Expanded(
           child: _buildMoneyCard(
             title: 'TỔNG CHI TIÊU',
-            amount: '3.000.000 đ',
+            amount: '${_formatAmount(expense)} đ',
             icon: Icons.arrow_upward,
             iconColor: const Color(0xFFFF5862),
             backgroundColor: const Color(0xFFFFECEE),
@@ -394,7 +455,12 @@ class DashboardScreen extends StatelessWidget {
         ),
 
         GestureDetector(
-          onTap: () {},
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransactionsScreen()),
+            );
+          },
           child: const Text(
             'Xem tất cả',
             style: TextStyle(
@@ -413,53 +479,7 @@ class DashboardScreen extends StatelessWidget {
   // =========================================================
 
   Widget _buildTransactionList() {
-    final transactions = [
-      {
-        'title': 'Ăn trưa',
-        'category': 'Ăn uống',
-        'date': '03/09/2024',
-        'amount': '-50.000 đ',
-        'icon': Icons.restaurant,
-        'color': const Color(0xFFFF792E),
-        'isIncome': false,
-      },
-      {
-        'title': 'Xăng xe',
-        'category': 'Di chuyển',
-        'date': '03/09/2024',
-        'amount': '-100.000 đ',
-        'icon': Icons.directions_car,
-        'color': const Color(0xFF168BF5),
-        'isIncome': false,
-      },
-      {
-        'title': 'Lương tháng 9',
-        'category': 'Thu nhập',
-        'date': '01/09/2024',
-        'amount': '+8.000.000 đ',
-        'icon': Icons.attach_money,
-        'color': const Color(0xFF28A745),
-        'isIncome': true,
-      },
-      {
-        'title': 'Mua sắm',
-        'category': 'Mua sắm',
-        'date': '31/08/2024',
-        'amount': '-300.000 đ',
-        'icon': Icons.shopping_cart,
-        'color': const Color(0xFFAA43F5),
-        'isIncome': false,
-      },
-      {
-        'title': 'Học phí',
-        'category': 'Giáo dục',
-        'date': '30/08/2024',
-        'amount': '-500.000 đ',
-        'icon': Icons.school,
-        'color': const Color(0xFF159B9B),
-        'isIncome': false,
-      },
-    ];
+    final recent = transactions.take(5).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -468,18 +488,23 @@ class DashboardScreen extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE9EDF2)),
       ),
       child: Column(
-        children: List.generate(transactions.length, (index) {
-          final transaction = transactions[index];
+        children: List.generate(recent.length, (index) {
+          final transaction = recent[index];
 
           return _buildTransactionItem(
-            title: transaction['title'] as String,
-            category: transaction['category'] as String,
-            date: transaction['date'] as String,
-            amount: transaction['amount'] as String,
-            icon: transaction['icon'] as IconData,
-            color: transaction['color'] as Color,
-            isIncome: transaction['isIncome'] as bool,
-            showDivider: index != transactions.length - 1,
+            title: transaction.title,
+            category: transaction.category,
+            date: _formatDate(transaction.date),
+            amount:
+                '${transaction.isIncome ? '+' : '-'}${_formatAmount(transaction.amount)} đ',
+            icon: transaction.isIncome
+                ? Icons.account_balance_wallet
+                : Icons.receipt_long,
+            color: transaction.isIncome
+                ? const Color(0xFF28A745)
+                : const Color(0xFFFF6268),
+            isIncome: transaction.isIncome,
+            showDivider: index != recent.length - 1,
           );
         }),
       ),

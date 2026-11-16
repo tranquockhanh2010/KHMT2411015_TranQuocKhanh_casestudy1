@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:andev/models/transaction.dart';
+import 'package:andev/services/transaction_service.dart';
+
 class TransactionForm extends StatefulWidget {
   final bool isEdit;
+  final Transaction? transaction;
 
-  const TransactionForm({
-    super.key,
-    required this.isEdit,
-  });
+  const TransactionForm({super.key, required this.isEdit, this.transaction});
 
   @override
   State<TransactionForm> createState() => _TransactionFormState();
@@ -17,22 +18,26 @@ class _TransactionFormState extends State<TransactionForm> {
 
   String category = 'Ăn uống';
 
-  DateTime selectedDate = DateTime(2025, 4, 12);
+  DateTime selectedDate = DateTime.now();
+  bool isSaving = false;
 
-  final TextEditingController amountController =
-  TextEditingController();
+  final TextEditingController amountController = TextEditingController();
 
-  final TextEditingController noteController =
-  TextEditingController();
+  final TextEditingController noteController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
 
-    // Nếu là màn hình Sửa giao dịch
-    if (widget.isEdit) {
-      amountController.text = '100.000';
-      noteController.text = 'Ăn trưa';
+    final transaction = widget.transaction;
+    if (transaction != null) {
+      isExpense = !transaction.isIncome;
+      category = transaction.category;
+      amountController.text = transaction.amount.toStringAsFixed(0);
+      noteController.text = transaction.note.isEmpty
+          ? transaction.title
+          : transaction.note;
+      selectedDate = DateTime.tryParse(transaction.date) ?? selectedDate;
     }
   }
 
@@ -91,18 +96,22 @@ class _TransactionFormState extends State<TransactionForm> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          if (widget.isEdit && widget.transaction?.id != null)
+            IconButton(
+              tooltip: 'Xóa giao dịch',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _deleteTransaction,
+            ),
+        ],
       ),
 
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // =========================
               // CHI TIÊU / THU NHẬP
               // =========================
@@ -114,7 +123,6 @@ class _TransactionFormState extends State<TransactionForm> {
               // =========================
               // DANH MỤC
               // =========================
-
               buildLabel('Danh mục'),
 
               const SizedBox(height: 7),
@@ -126,7 +134,6 @@ class _TransactionFormState extends State<TransactionForm> {
               // =========================
               // SỐ TIỀN
               // =========================
-
               buildLabel('Số tiền'),
 
               const SizedBox(height: 7),
@@ -138,7 +145,6 @@ class _TransactionFormState extends State<TransactionForm> {
               // =========================
               // NGÀY GIAO DỊCH
               // =========================
-
               buildLabel('Ngày giao dịch'),
 
               const SizedBox(height: 7),
@@ -150,7 +156,6 @@ class _TransactionFormState extends State<TransactionForm> {
               // =========================
               // GHI CHÚ
               // =========================
-
               buildLabel('Ghi chú'),
 
               const SizedBox(height: 7),
@@ -162,7 +167,6 @@ class _TransactionFormState extends State<TransactionForm> {
               // =========================
               // BUTTON LƯU
               // =========================
-
               buildSaveButton(),
 
               const SizedBox(height: 20),
@@ -196,14 +200,11 @@ class _TransactionFormState extends State<TransactionForm> {
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        border: Border.all(
-          color: const Color(0xFFE1E5EB),
-        ),
+        border: Border.all(color: const Color(0xFFE1E5EB)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-
           Expanded(
             child: GestureDetector(
               onTap: () {
@@ -213,9 +214,7 @@ class _TransactionFormState extends State<TransactionForm> {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: isExpense
-                      ? const Color(0xFFFF6268)
-                      : Colors.white,
+                  color: isExpense ? const Color(0xFFFF6268) : Colors.white,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 alignment: Alignment.center,
@@ -224,9 +223,7 @@ class _TransactionFormState extends State<TransactionForm> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: isExpense
-                        ? Colors.white
-                        : const Color(0xFF18243A),
+                    color: isExpense ? Colors.white : const Color(0xFF18243A),
                   ),
                 ),
               ),
@@ -242,9 +239,7 @@ class _TransactionFormState extends State<TransactionForm> {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: !isExpense
-                      ? const Color(0xFF3B82F6)
-                      : Colors.white,
+                  color: !isExpense ? const Color(0xFF3B82F6) : Colors.white,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 alignment: Alignment.center,
@@ -253,9 +248,7 @@ class _TransactionFormState extends State<TransactionForm> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: !isExpense
-                        ? Colors.white
-                        : const Color(0xFF18243A),
+                    color: !isExpense ? Colors.white : const Color(0xFF18243A),
                   ),
                 ),
               ),
@@ -275,9 +268,7 @@ class _TransactionFormState extends State<TransactionForm> {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: const Color(0xFFDDE3EA),
-        ),
+        border: Border.all(color: const Color(0xFFDDE3EA)),
         borderRadius: BorderRadius.circular(7),
       ),
       child: DropdownButtonHideUnderline(
@@ -296,42 +287,26 @@ class _TransactionFormState extends State<TransactionForm> {
               value: 'Ăn uống',
               child: Row(
                 children: [
-                  Icon(
-                    Icons.restaurant,
-                    size: 17,
-                    color: Color(0xFFFF6268),
-                  ),
+                  Icon(Icons.restaurant, size: 17, color: Color(0xFFFF6268)),
                   SizedBox(width: 10),
-                  Text(
-                    'Ăn uống',
-                    style: TextStyle(fontSize: 13),
-                  ),
+                  Text('Ăn uống', style: TextStyle(fontSize: 13)),
                 ],
               ),
             ),
 
             DropdownMenuItem(
               value: 'Di chuyển',
-              child: Text(
-                'Di chuyển',
-                style: TextStyle(fontSize: 13),
-              ),
+              child: Text('Di chuyển', style: TextStyle(fontSize: 13)),
             ),
 
             DropdownMenuItem(
               value: 'Mua sắm',
-              child: Text(
-                'Mua sắm',
-                style: TextStyle(fontSize: 13),
-              ),
+              child: Text('Mua sắm', style: TextStyle(fontSize: 13)),
             ),
 
             DropdownMenuItem(
               value: 'Học tập',
-              child: Text(
-                'Học tập',
-                style: TextStyle(fontSize: 13),
-              ),
+              child: Text('Học tập', style: TextStyle(fontSize: 13)),
             ),
           ],
 
@@ -358,16 +333,10 @@ class _TransactionFormState extends State<TransactionForm> {
 
       decoration: InputDecoration(
         hintText: 'Nhập số tiền',
-        hintStyle: const TextStyle(
-          color: Color(0xFFB0B8C4),
-          fontSize: 12,
-        ),
+        hintStyle: const TextStyle(color: Color(0xFFB0B8C4), fontSize: 12),
 
         suffixText: 'đ',
-        suffixStyle: const TextStyle(
-          color: Color(0xFF687386),
-          fontSize: 12,
-        ),
+        suffixStyle: const TextStyle(color: Color(0xFF687386), fontSize: 12),
 
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -376,23 +345,17 @@ class _TransactionFormState extends State<TransactionForm> {
 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(7),
-          borderSide: const BorderSide(
-            color: Color(0xFFDDE3EA),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
         ),
 
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(7),
-          borderSide: const BorderSide(
-            color: Color(0xFFDDE3EA),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
         ),
 
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(7),
-          borderSide: const BorderSide(
-            color: Color(0xFF2878E8),
-          ),
+          borderSide: const BorderSide(color: Color(0xFF2878E8)),
         ),
       ),
     );
@@ -409,21 +372,15 @@ class _TransactionFormState extends State<TransactionForm> {
         height: 42,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: const Color(0xFFDDE3EA),
-          ),
+          border: Border.all(color: const Color(0xFFDDE3EA)),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Row(
           children: [
-
             Expanded(
               child: Text(
                 formatDate(selectedDate),
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF3E4A5C),
-                ),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF3E4A5C)),
               ),
             ),
 
@@ -449,32 +406,23 @@ class _TransactionFormState extends State<TransactionForm> {
 
       decoration: InputDecoration(
         hintText: 'Nhập ghi chú (tùy chọn)',
-        hintStyle: const TextStyle(
-          color: Color(0xFFB0B8C4),
-          fontSize: 12,
-        ),
+        hintStyle: const TextStyle(color: Color(0xFFB0B8C4), fontSize: 12),
 
         contentPadding: const EdgeInsets.all(12),
 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(7),
-          borderSide: const BorderSide(
-            color: Color(0xFFDDE3EA),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
         ),
 
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(7),
-          borderSide: const BorderSide(
-            color: Color(0xFFDDE3EA),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
         ),
 
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(7),
-          borderSide: const BorderSide(
-            color: Color(0xFF2878E8),
-          ),
+          borderSide: const BorderSide(color: Color(0xFF2878E8)),
         ),
       ),
     );
@@ -490,13 +438,7 @@ class _TransactionFormState extends State<TransactionForm> {
       height: 44,
 
       child: ElevatedButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Đã lưu giao dịch'),
-            ),
-          );
-        },
+        onPressed: isSaving ? null : _saveTransaction,
 
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2878E8),
@@ -504,39 +446,109 @@ class _TransactionFormState extends State<TransactionForm> {
 
           elevation: 0,
 
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(7),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
         ),
 
         child: const Text(
           'Lưu',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );
   }
+
+  Future<void> _saveTransaction() async {
+    final amount = double.tryParse(
+      amountController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+    );
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập số tiền hợp lệ')),
+      );
+      return;
+    }
+
+    setState(() => isSaving = true);
+    final existing = widget.transaction;
+    final transaction = Transaction(
+      id: existing?.id,
+      title: noteController.text.trim().isEmpty
+          ? category
+          : noteController.text.trim(),
+      amount: amount,
+      date: selectedDate.toIso8601String(),
+      category: category,
+      isIncome: !isExpense,
+      note: noteController.text.trim(),
+    );
+
+    try {
+      if (widget.isEdit) {
+        await TransactionService.update(transaction);
+      } else {
+        await TransactionService.save(transaction);
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted) {
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể lưu giao dịch')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteTransaction() async {
+    final id = widget.transaction?.id;
+    if (id == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa giao dịch?'),
+        content: const Text('Giao dịch này sẽ bị xóa vĩnh viễn.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await TransactionService.delete(id);
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể xóa giao dịch')),
+        );
+      }
+    }
+  }
 }
+
 class AddTransactionScreen extends StatelessWidget {
   const AddTransactionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const TransactionForm(
-      isEdit: false,
-    );
+    return TransactionForm(isEdit: false);
   }
 }
+
 class EditTransactionScreen extends StatelessWidget {
-  const EditTransactionScreen({super.key});
+  final Transaction transaction;
+
+  const EditTransactionScreen({super.key, required this.transaction});
 
   @override
   Widget build(BuildContext context) {
-    return const TransactionForm(
-      isEdit: true,
-    );
+    return TransactionForm(isEdit: true, transaction: transaction);
   }
 }
